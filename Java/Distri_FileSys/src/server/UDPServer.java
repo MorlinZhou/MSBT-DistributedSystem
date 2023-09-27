@@ -1,22 +1,41 @@
 package server;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.*;
 import java.io.*;
 
 
 public class UDPServer {
     public static void main(String args[]) throws IOException {
-        DatagramSocket socket=null;
         System.out.println("服务开启...");
         try{
-            socket=new DatagramSocket(8088);
-            byte[] receiveData = new byte[1024];
+            ServerSocket server = new ServerSocket(8080);
+            System.out.println("Server is running...");
+//            byte[] receiveData = new byte[1024];
             while(true){
-                DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+                Socket socket = server.accept();
+//                DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
                 // 接收客户端发送的数据包
-                socket.receive(receivePacket);
+                ObjectInputStream input = new ObjectInputStream(socket.getInputStream());
+                ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
+                // 读取接口名
+                String interfaceName = input.readUTF();
+                // 读取方法名
+                String methodName = input.readUTF();
+                // 读取方法参数类型
+                Class<?>[] parameterTypes = (Class<?>[]) input.readObject();
+                // 读取方法参数值
+                Object[] arguments = (Object[]) input.readObject();
 
-                // 从数据包中提取客户端的消息
+                Class<?> serviceInterfaceClass = Class.forName(interfaceName);
+                Object service = new ServiceImpl();
+                Method method = serviceInterfaceClass.getMethod(methodName, parameterTypes);
+                Object result = method.invoke(service, arguments);
+
+                output.writeObject(result);
+
+                /*// 从数据包中提取客户端的消息
                 String clientMessage = new String(receivePacket.getData(), 0, receivePacket.getLength());
                 System.out.println("Received from client: " + clientMessage);
                 // 构建回应消息
@@ -29,14 +48,12 @@ public class UDPServer {
 
                 // 创建回应数据包并发送给客户端
                 DatagramPacket responsePacket = new DatagramPacket(responseData, responseData.length, clientAddress, clientPort);
-                socket.send(responsePacket);
+                socket.send(responsePacket);*/
             }
         } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            if (socket != null && !socket.isClosed()) {
-                socket.close();
-            }
+        } catch (ClassNotFoundException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
+            throw new RuntimeException(e);
         }
     }
 }
