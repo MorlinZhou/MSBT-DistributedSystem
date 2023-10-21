@@ -28,7 +28,7 @@ public class UDPServer {
 
 
     public void start() throws IOException {
-        System.out.println("UDPServer online...");
+        System.out.println("UDPServer online at port: "+PORT);
         byte[] receiveBuffer = new byte[BUFFER_SIZE];
         while (true) {
             DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
@@ -44,9 +44,6 @@ public class UDPServer {
     private String handleRequest(String request, InetAddress address, int port) {
         String[] parts = request.split(":");
         String command = parts[0];
-//        if (parts.length != 4 || !parts[0].equals("READ")) {
-//            return "ERROR:Invalid request format";
-//        }
         if ("READ".equals(command)) {
             String filePath = parts[1];
             int offset;
@@ -77,6 +74,8 @@ public class UDPServer {
             return response;
         } else if ("MONITOR".equals(command)) {
             return handleMonitorRequest(parts,address, port);
+        } else if ("RENAME".equals(command)) {
+            return handleRenameRequest(parts);
         }else {
             return "ERROR:Invalid request format";
         }
@@ -86,7 +85,6 @@ public class UDPServer {
         if (parts.length != 4) {
             return "ERROR:Invalid request format";
         }
-
         String filePath = parts[1];
         int offset;
         try {
@@ -154,12 +152,43 @@ public class UDPServer {
         for (RegisteredClient client : clients) {
             if (client.endTime > System.currentTimeMillis()) {
                 DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, client.address, client.port);
+                System.out.println(sendPacket);
                 try {
                     socket.send(sendPacket);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
+        }
+    }
+
+    private String handleRenameRequest(String[] parts) {
+        if (parts.length != 3) {
+            return "ERROR:Invalid request format";
+        }
+
+        String oldFilePath = parts[1];
+        String newFileName = parts[2];
+        File oldFile = new File(oldFilePath);
+        File newFile = new File(oldFile.getParent(), newFileName);
+
+        if (!oldFile.exists()) {
+            return "ERROR:File not found";
+        }
+
+        if (newFile.exists()) {
+            return "ERROR:File with the new name already exists";
+        }
+
+        if (oldFile.renameTo(newFile)) {
+            if (registeredClients.containsKey(oldFilePath)) {
+                List<RegisteredClient> clients = registeredClients.remove(oldFilePath);
+                registeredClients.put(newFile.getPath(), clients);
+                notifyRegisteredClients(newFile.getPath(), "File renamed to: " + newFileName);
+            }
+            return "SUCCESS:File renamed successfully";
+        } else {
+            return "ERROR:Failed to rename the file";
         }
     }
 
