@@ -3,8 +3,8 @@ import java.net.*;
 import java.util.Scanner;
 
 public class Client {
-    private final DatagramSocket socket;
-    private final InetAddress serverAddress;
+    private DatagramSocket socket;
+    private InetAddress serverAddress;
     private static final int PORT = 8080;
     private static final int BUFFER_SIZE = 1024;
 
