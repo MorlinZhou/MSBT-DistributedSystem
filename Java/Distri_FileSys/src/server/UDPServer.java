@@ -123,21 +123,46 @@ public class UDPServer {
         long interval;
         try {
             interval = Long.parseLong(parts[2]);
+            if (interval < 0) {
+                return "ERROR:Interval cannot be negative";
+            }
         } catch (NumberFormatException e) {
             return "ERROR:Invalid interval";
+        }
+
+        File file = new File(filePath);
+        if (!file.exists()) {
+            return "ERROR:File does not exist";
         }
 
         if (!registeredClients.containsKey(filePath)) {
             registeredClients.put(filePath, new ArrayList<>());
         }
-        registeredClients.get(filePath).add(new RegisteredClient(address, port, interval));
+        RegisteredClient newClient = new RegisteredClient(address, port, interval);
+        registeredClients.get(filePath).add(newClient);
 
         // Schedule cleanup task to remove client registration after the interval
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                registeredClients.get(filePath).removeIf(client -> client.endTime <= System.currentTimeMillis());
+                List<RegisteredClient> clients = registeredClients.get(filePath);
+                clients.removeIf(client -> {
+                    if (client.endTime <= System.currentTimeMillis()) {
+                        // Send MONITORING EXPIRED message to client when its monitoring time expires
+                        if (client.address.equals(newClient.address) && client.port == newClient.port) {
+                            byte[] sendBuffer = "MONITORING EXPIRED".getBytes();
+                            DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, client.address, client.port);
+                            try {
+                                socket.send(sendPacket);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        return true;
+                    }
+                    return false;
+                });
             }
         }, interval);
 

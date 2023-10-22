@@ -52,10 +52,17 @@ public class Client {
             System.out.println(response);
             while (true) { // Continuously monitor for updates until the interval expires
                 socket.receive(receivePacket);
-                System.out.println("Received update: " + new String(receivePacket.getData(), 0, receivePacket.getLength()));
+                String updateMessage = new String(receivePacket.getData(), 0, receivePacket.getLength());
+                if ("MONITORING EXPIRED".equals(updateMessage)) {
+                    System.out.println("Monitoring session has ended.");
+                    break;
+                } else {
+                    System.out.println("Received update: " + updateMessage);
+                }
             }
         }
-        return response;
+        else return response;
+        return "";
     }
 
     public String renameFile(String oldFilePath, String newFileName) throws IOException {
