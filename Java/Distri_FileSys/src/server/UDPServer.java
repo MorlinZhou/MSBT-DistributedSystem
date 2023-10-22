@@ -152,7 +152,7 @@ public class UDPServer {
         for (RegisteredClient client : clients) {
             if (client.endTime > System.currentTimeMillis()) {
                 DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, client.address, client.port);
-                System.out.println(sendPacket);
+//                System.out.println(sendPacket);
                 try {
                     socket.send(sendPacket);
                 } catch (IOException e) {

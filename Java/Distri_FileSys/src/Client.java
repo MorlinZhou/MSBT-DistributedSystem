@@ -5,8 +5,8 @@ import java.util.Scanner;
 public class Client {
     private DatagramSocket socket;
     private InetAddress serverAddress;
-    private static final int PORT = 8080;
-    private static final int BUFFER_SIZE = 1024;
+    private static int PORT = 8080;
+    private static int BUFFER_SIZE = 1024;
 
     public Client() throws SocketException, UnknownHostException {
         socket = new DatagramSocket();
