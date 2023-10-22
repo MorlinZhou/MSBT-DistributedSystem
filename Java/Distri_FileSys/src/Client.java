@@ -1,19 +1,33 @@
 import java.io.*;
 import java.net.*;
+import java.util.Map;
 import java.util.Scanner;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Client {
     private DatagramSocket socket;
     private InetAddress serverAddress;
     private static int PORT = 8080;
     private static int BUFFER_SIZE = 1024;
+    private Map<String, String> cache = new ConcurrentHashMap<>();
 
     public Client() throws SocketException, UnknownHostException {
         socket = new DatagramSocket();
         serverAddress = InetAddress.getByName("localhost");
     }
+    //系统应该实现客户端缓存，即客户端读取的⽂件内容保留在客户端程序的缓冲区中
 
     public String readFile(String filePath, int offset, int byteCount) throws IOException {
+        String fileContentInCache = cache.get(filePath);
+        if (fileContentInCache != null) {
+            // Return the content from the cache
+            if(byteCount+offset <= fileContentInCache.length()){
+                System.out.println("Reading from cache.");
+                return fileContentInCache.substring(offset, byteCount+offset);
+            }
+            // else, if the cached content is not sufficient, request from server again (you may choose to handle this differently)
+        }
+
         String request = "READ:" + filePath + ":" + offset + ":" + byteCount;
         byte[] sendBuffer = request.getBytes();
         DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, serverAddress, PORT);
@@ -22,10 +36,14 @@ public class Client {
         byte[] receiveBuffer = new byte[BUFFER_SIZE];
         DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
         socket.receive(receivePacket);
-        return new String(receivePacket.getData(), 0, receivePacket.getLength());
+        String fetchedContent = new String(receivePacket.getData(), 0, receivePacket.getLength());
+        cache.put(filePath, fetchedContent);
+        return fetchedContent;
     }
 
+
     public String writeToFile(String filePath, int offset, String byteSequence) throws IOException {
+        cache.put(filePath, byteSequence);
         String request = "WRITE:" + filePath + ":" + offset + ":" + byteSequence;
         byte[] sendBuffer = request.getBytes();
         DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, serverAddress, PORT);
