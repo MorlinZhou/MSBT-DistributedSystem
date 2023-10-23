@@ -7,7 +7,7 @@ import java.util.*;
 public class UDPServer {
     private DatagramSocket socket;
     private static final int PORT = 8080;
-    private static final int BUFFER_SIZE = 1024;
+    private static final int BUFFER_SIZE = 10000;
     private Map<String, List<RegisteredClient>> registeredClients = new HashMap<>();
 
     public UDPServer() throws SocketException {
@@ -28,12 +28,12 @@ public class UDPServer {
 
 
     public void start() throws IOException {
-        System.out.println("UDPServer online at port: "+PORT);
+        System.out.println("UDPServer online at port: " + PORT);
         byte[] receiveBuffer = new byte[BUFFER_SIZE];
         while (true) {
             DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
             socket.receive(receivePacket);
-            String request = new String(receivePacket.getData(), 0, receivePacket.getLength());
+            byte[] request = receivePacket.getData();
             String response = handleRequest(request, receivePacket.getAddress(), receivePacket.getPort());
             byte[] sendBuffer = response.getBytes();
             DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, receivePacket.getAddress(), receivePacket.getPort());
@@ -41,27 +41,27 @@ public class UDPServer {
         }
     }
 
-    private String handleRequest(String request, InetAddress address, int port) {
-        String[] parts = request.split(":");
-        String command = parts[0];
+    private String handleRequest(byte[] request, InetAddress address, int port) {
+        int offset = 0;
+        String command = MessageUtil.bytesToString(request, offset);
+        offset += 4 + command.length();
+        String filePath = MessageUtil.bytesToString(request, offset);
+        offset += 4 + filePath.length();
         if ("READ".equals(command)) {
-            String filePath = parts[1];
-            int offset;
-            int byteCount;
+            int requestOffset = MessageUtil.bytesToInt(Arrays.copyOfRange(request, offset, offset + 4));
+            offset += 4;
+            int byteCount = MessageUtil.bytesToInt(Arrays.copyOfRange(request, offset, offset + 4));
             try {
-                offset = Integer.parseInt(parts[2]);
-                byteCount = Integer.parseInt(parts[3]);
             } catch (NumberFormatException e) {
                 return "ERROR:Invalid offset or byte count";
             }
             try (RandomAccessFile file = new RandomAccessFile(filePath, "r")) {
-                if (offset >= file.length()) {
+                if (requestOffset >= file.length()) {
                     return "ERROR:Offset exceeds file length";
                 }
                 byte[] buffer = new byte[byteCount];
-                file.seek(offset);
+                file.seek(requestOffset);
                 int bytesRead = file.read(buffer, 0, byteCount);
-
                 return "CONTENT:" + new String(buffer, 0, bytesRead);
             } catch (FileNotFoundException e) {
                 return "ERROR:File not found";
@@ -69,60 +69,63 @@ public class UDPServer {
                 return "ERROR:" + e.getMessage();
             }
         } else if ("WRITE".equals(command)) {
-            String response = handleWriteRequest(parts);
-            notifyRegisteredClients(parts[1], parts[3]); // notify about the written content
+            String response = handleWriteRequest(request);
+            // notify about the written content
             return response;
-        } else if ("MONITOR".equals(command)) {
-            return handleMonitorRequest(parts,address, port);
+        }else if ("MONITOR".equals(command)) {
+            return handleMonitorRequest(request,address, port);
         } else if ("RENAME".equals(command)) {
-            return handleRenameRequest(parts);
+            return handleRenameRequest(request);
         }else {
             return "ERROR:Invalid request format";
         }
     }
 
-    private String handleWriteRequest(String[] parts) {
-        if (parts.length != 4) {
-            return "ERROR:Invalid request format";
-        }
-        String filePath = parts[1];
-        int offset;
-        try {
-            offset = Integer.parseInt(parts[2]);
-        } catch (NumberFormatException e) {
-            return "ERROR:Invalid offset";
-        }
-        String byteSequence = parts[3];
 
-        try (RandomAccessFile file = new RandomAccessFile(filePath, "rw")) {
-            if (offset > file.length()) {
-                return "ERROR:Offset exceeds file length";
-            }
-
-            byte[] restOfFile = new byte[(int) (file.length() - offset)];
-            file.seek(offset);
-            file.readFully(restOfFile);
-            file.seek(offset);
-            file.write(byteSequence.getBytes());
-            file.write(restOfFile);
-
-            return "SUCCESS:Content written successfully";
-        } catch (FileNotFoundException e) {
+    private String handleWriteRequest(byte[] request) {
+        int offset=0;
+        String command = MessageUtil.bytesToString(request, offset);
+        offset += 4 + command.length();
+        String filePath = MessageUtil.bytesToString(request, offset);
+        offset += 4 + filePath.length();
+        int requestOffset = MessageUtil.bytesToInt(Arrays.copyOfRange(request, offset, offset + 4));
+        offset += 4;
+        String byteSequence = MessageUtil.bytesToString(request, offset);
+        File f = new File(filePath);
+        if (!f.exists()) {
             return "ERROR:File not found";
-        } catch (IOException e) {
-            return "ERROR:" + e.getMessage();
+        }
+        else {
+            try (RandomAccessFile file = new RandomAccessFile(filePath, "rw")) {
+                if (requestOffset > file.length()) {
+                    return "ERROR:Offset exceeds file length";
+                }
+
+                byte[] restOfFile = new byte[(int) (file.length() - requestOffset)];
+                file.seek(requestOffset);
+                file.readFully(restOfFile);
+                file.seek(requestOffset);
+                file.write(byteSequence.getBytes());
+                file.write(restOfFile);
+
+                notifyRegisteredClients(filePath, byteSequence);
+                return "SUCCESS:Content written successfully";
+            } catch (FileNotFoundException e) {
+                return "ERROR:File not found";
+            } catch (IOException e) {
+                return "ERROR:" + e.getMessage();
+            }
         }
     }
 
-    private String handleMonitorRequest(String[] parts, InetAddress address, int port) {
-        if (parts.length != 3) {
-            return "ERROR:Invalid request format";
-        }
-
-        String filePath = parts[1];
-        long interval;
+    private String handleMonitorRequest(byte[] request, InetAddress address, int port) {
+        int offset=0;
+        String command = MessageUtil.bytesToString(request, offset);
+        offset += 4 + command.length();
+        String filePath = MessageUtil.bytesToString(request, offset);
+        offset += 4 + filePath.length();
+        long interval= MessageUtil.longByteToLong(request,offset);
         try {
-            interval = Long.parseLong(parts[2]);
             if (interval < 0) {
                 return "ERROR:Interval cannot be negative";
             }
@@ -187,13 +190,13 @@ public class UDPServer {
         }
     }
 
-    private String handleRenameRequest(String[] parts) {
-        if (parts.length != 3) {
-            return "ERROR:Invalid request format";
-        }
-
-        String oldFilePath = parts[1];
-        String newFileName = parts[2];
+    private String handleRenameRequest(byte[] request) {
+        int offset=0;
+        String command = MessageUtil.bytesToString(request, offset);
+        offset += 4 + command.length();
+        String oldFilePath = MessageUtil.bytesToString(request, offset);
+        offset += 4 + oldFilePath.length();
+        String newFileName=MessageUtil.bytesToString(request,offset);
         File oldFile = new File(oldFilePath);
         File newFile = new File(oldFile.getParent(), newFileName);
 

@@ -1,3 +1,5 @@
+import server.MessageUtil;
+
 import java.io.*;
 import java.net.*;
 import java.util.Map;
@@ -8,7 +10,7 @@ public class Client {
     private DatagramSocket socket;
     private InetAddress serverAddress;
     private static int PORT = 8080;
-    private static int BUFFER_SIZE = 1024;
+    private static int BUFFER_SIZE = 10000;
     private Map<String, String> cache = new ConcurrentHashMap<>();
 
     public Client() throws SocketException, UnknownHostException {
@@ -27,9 +29,12 @@ public class Client {
             }
             // else, if the cached content is not sufficient, request from server again (you may choose to handle this differently)
         }
-
-        String request = "READ:" + filePath + ":" + offset + ":" + byteCount;
-        byte[] sendBuffer = request.getBytes();
+        ByteArrayOutputStream requestStream = new ByteArrayOutputStream();
+        requestStream.write(MessageUtil.stringToBytes("READ"));
+        requestStream.write(MessageUtil.stringToBytes(filePath));
+        requestStream.write(MessageUtil.intToBytes(offset));
+        requestStream.write(MessageUtil.intToBytes(byteCount));
+        byte[] sendBuffer = requestStream.toByteArray();
         DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, serverAddress, PORT);
         socket.send(sendPacket);
 
@@ -44,8 +49,12 @@ public class Client {
 
     public String writeToFile(String filePath, int offset, String byteSequence) throws IOException {
         cache.put(filePath, byteSequence);
-        String request = "WRITE:" + filePath + ":" + offset + ":" + byteSequence;
-        byte[] sendBuffer = request.getBytes();
+        ByteArrayOutputStream requestStream = new ByteArrayOutputStream();
+        requestStream.write(MessageUtil.stringToBytes("WRITE"));
+        requestStream.write(MessageUtil.stringToBytes(filePath));
+        requestStream.write(MessageUtil.intToBytes(offset));
+        requestStream.write(MessageUtil.stringToBytes(byteSequence));
+        byte[] sendBuffer = requestStream.toByteArray();
         DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, serverAddress, PORT);
         socket.send(sendPacket);
 
@@ -56,8 +65,11 @@ public class Client {
     }
 
     public String monitorFile(String filePath, long interval) throws IOException {
-        String request = "MONITOR:" + filePath + ":" + interval;
-        byte[] sendBuffer = request.getBytes();
+        ByteArrayOutputStream requestStream = new ByteArrayOutputStream();
+        requestStream.write(MessageUtil.stringToBytes("MONITOR"));
+        requestStream.write(MessageUtil.stringToBytes(filePath));
+        requestStream.write(MessageUtil.longToBytes(interval));
+        byte[] sendBuffer = requestStream.toByteArray();
         DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, serverAddress, PORT);
         socket.send(sendPacket);
 
@@ -84,8 +96,11 @@ public class Client {
     }
 
     public String renameFile(String oldFilePath, String newFileName) throws IOException {
-        String request = "RENAME:" + oldFilePath + ":" + newFileName;
-        byte[] sendBuffer = request.getBytes();
+        ByteArrayOutputStream requestStream = new ByteArrayOutputStream();
+        requestStream.write(MessageUtil.stringToBytes("RENAME"));
+        requestStream.write(MessageUtil.stringToBytes(oldFilePath));
+        requestStream.write(MessageUtil.stringToBytes(newFileName));
+        byte[] sendBuffer = requestStream.toByteArray();
         DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, serverAddress, PORT);
         socket.send(sendPacket);
 
