@@ -114,12 +114,26 @@ public class Client {
         return new String(receivePacket.getData(), 0, receivePacket.getLength());
     }
 
+    public String searchFile(String fileName)throws IOException {
+        MyByteArrayStream requestStream = new MyByteArrayStream();
+        requestStream.write(MessageUtil.stringToBytes("SEARCH"));
+        requestStream.write(MessageUtil.stringToBytes(fileName));
+        byte[] sendBuffer = requestStream.toByteArray();
+        DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, serverAddress, PORT);
+        socket.send(sendPacket);
+        byte[] receiveBuffer = new byte[BUFFER_SIZE];
+        DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
+        socket.receive(receivePacket);
+        String response = new String(receivePacket.getData(), 0, receivePacket.getLength());
+        return response;
+    }
+
     public static void main(String[] args) throws IOException {
         Client client = new Client();
         Scanner scanner = new Scanner(System.in);
 
         while (true) {
-            System.out.println("Choose operation (READ/WRITE/MONITOR/RENAME/EXIT):");
+            System.out.println("Choose operation (READ/WRITE/MONITOR/RENAME/SEARCH/EXIT):");
             String operation = scanner.nextLine().toUpperCase();
             if ("EXIT".equals(operation)) {
                 System.out.println("Exiting program...");
@@ -164,6 +178,11 @@ public class Client {
                 String newFileName = scanner.nextLine();
 
                 String response = client.renameFile(oldFilePath, newFileName);
+                System.out.println(response);
+            }else if ("SEARCH".equals(operation)){
+                System.out.println("Enter the file name you want to search:");
+                String fileName = scanner.nextLine();
+                String response=client.searchFile(fileName);
                 System.out.println(response);
             }else {
                 System.out.println("Invalid operation. Please choose the right operation.");

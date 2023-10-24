@@ -56,6 +56,8 @@ public class UDPServer {
             return handleMonitorRequest(request,address, port);
         } else if ("RENAME".equals(command)) {
             return handleRenameRequest(request);
+        }else if ("SEARCH".equals(command)){
+            return handleSearchFile(request);
         }else {
             return "ERROR:Invalid request format";
         }
@@ -226,6 +228,20 @@ public class UDPServer {
         } else {
             return "ERROR:Failed to rename the file";
         }
+    }
+
+    private String handleSearchFile(byte[] request){
+        int offset=0;
+        String command = MessageUtil.bytesToString(request, offset);
+        offset += 4 + command.length();
+        String fileName=MessageUtil.bytesToString(request,offset);
+        File[] files=new File("/Users/zhouhuayu/Desktop/").listFiles();
+        for(File file : files){
+            if(file.getName().equals(fileName)){
+                return "File found at: "+file.getAbsolutePath();
+            }
+        }
+        return "File not found";
     }
 
     public static void main(String[] args) throws IOException {
