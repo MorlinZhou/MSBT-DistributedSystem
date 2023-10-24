@@ -13,13 +13,14 @@ public class Client {
     private InetAddress serverAddress;
     private static int PORT = 8080;
     private static int BUFFER_SIZE = 10000;
+    private static int FRESHNESS_INTERVAL = 0;
     private Map<String, String> cache = new ConcurrentHashMap<>();
-
     private static String rootPath="/Users/zhouhuayu/Desktop/";
 
-    public Client() throws SocketException, UnknownHostException {
+    public Client(int freshInter) throws SocketException, UnknownHostException {
         socket = new DatagramSocket();
         serverAddress = InetAddress.getByName("localhost");
+        FRESHNESS_INTERVAL=freshInter;
     }
     //系统应该实现客户端缓存，即客户端读取的⽂件内容保留在客户端程序的缓冲区中
 
@@ -33,6 +34,7 @@ public class Client {
             }
             // else, if the cached content is not sufficient, request from server again (you may choose to handle this differently)
         }
+        //Using custom ByteArrayOutputStream class
         MyByteArrayStream requestStream = new MyByteArrayStream();
         requestStream.write(MessageUtil.stringToBytes("READ"));
         requestStream.write(MessageUtil.stringToBytes(filePath));
@@ -53,6 +55,7 @@ public class Client {
 
     public String writeToFile(String filePath, int offset, String byteSequence) throws IOException {
         cache.put(filePath, byteSequence);
+        //Using custom ByteArrayOutputStream class
         MyByteArrayStream requestStream = new MyByteArrayStream();
         requestStream.write(MessageUtil.stringToBytes("WRITE"));
         requestStream.write(MessageUtil.stringToBytes(filePath));
@@ -69,6 +72,7 @@ public class Client {
     }
 
     public String monitorFile(String filePath, long interval) throws IOException {
+        //Using custom ByteArrayOutputStream class
         MyByteArrayStream requestStream = new MyByteArrayStream();
         requestStream.write(MessageUtil.stringToBytes("MONITOR"));
         requestStream.write(MessageUtil.stringToBytes(filePath));
@@ -129,9 +133,11 @@ public class Client {
     }
 
     public static void main(String[] args) throws IOException {
-        Client client = new Client();
         Scanner scanner = new Scanner(System.in);
-
+        System.out.println("Please set up the freshness interval before start.(in milliseconds");
+        int freshInter=scanner.nextInt();
+        Client client = new Client(freshInter);
+        //processing instructions
         while (true) {
             System.out.println("Choose operation (READ/WRITE/MONITOR/RENAME/SEARCH/EXIT):");
             String operation = scanner.nextLine().toUpperCase();
