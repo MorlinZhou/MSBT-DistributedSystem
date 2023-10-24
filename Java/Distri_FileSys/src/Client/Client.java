@@ -134,9 +134,23 @@ public class Client {
 
     public static void main(String[] args) throws IOException {
         Scanner scanner = new Scanner(System.in);
-        System.out.println("Please set up the freshness interval before start.(in milliseconds");
-        int freshInter=scanner.nextInt();
-        Client client = new Client(freshInter);
+        Client client;
+        while(true){
+            System.out.println("Please set up a valid freshness interval before start.(in milliseconds");
+            int freshInter= Integer.parseInt(scanner.nextLine());
+            try {
+                if (freshInter <= 0) {
+                    System.out.println("ERROR:Interval must be positive");
+                }
+                else{
+                    client = new Client(freshInter);
+                    break;
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("ERROR:Invalid interval");
+            }
+        }
+
         //processing instructions
         while (true) {
             System.out.println("Choose operation (READ/WRITE/MONITOR/RENAME/SEARCH/EXIT):");

@@ -45,7 +45,7 @@
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
-  <component name="RunManager" selected="应用程序.UDPServer">
+  <component name="RunManager" selected="应用程序.Client">
     <configuration name="Client" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <option name="MAIN_CLASS_NAME" value="Client.Client" />
       <module name="Distri_FileSys" />
@@ -83,7 +83,7 @@
       <updated>1697960456744</updated>
       <workItem from="1697960457778" duration="2422000" />
       <workItem from="1697989868306" duration="8739000" />
-      <workItem from="1698126416046" duration="4588000" />
+      <workItem from="1698126416046" duration="6105000" />
     </task>
     <servers />
   </component>
