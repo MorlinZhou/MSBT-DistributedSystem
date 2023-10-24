@@ -42,32 +42,12 @@ public class UDPServer {
     }
 
     private String handleRequest(byte[] request, InetAddress address, int port) {
-        int offset = 0;
+        int offset=0;
         String command = MessageUtil.bytesToString(request, offset);
-        offset += 4 + command.length();
-        String filePath = MessageUtil.bytesToString(request, offset);
-        offset += 4 + filePath.length();
         if ("READ".equals(command)) {
-            int requestOffset = MessageUtil.bytesToInt(Arrays.copyOfRange(request, offset, offset + 4));
-            offset += 4;
-            int byteCount = MessageUtil.bytesToInt(Arrays.copyOfRange(request, offset, offset + 4));
-            try {
-            } catch (NumberFormatException e) {
-                return "ERROR:Invalid offset or byte count";
-            }
-            try (RandomAccessFile file = new RandomAccessFile(filePath, "r")) {
-                if (requestOffset >= file.length()) {
-                    return "ERROR:Offset exceeds file length";
-                }
-                byte[] buffer = new byte[byteCount];
-                file.seek(requestOffset);
-                int bytesRead = file.read(buffer, 0, byteCount);
-                return "CONTENT:" + new String(buffer, 0, bytesRead);
-            } catch (FileNotFoundException e) {
-                return "ERROR:File not found";
-            } catch (IOException e) {
-                return "ERROR:" + e.getMessage();
-            }
+            String response = handleReadRequest(request);
+            return response;
+
         } else if ("WRITE".equals(command)) {
             String response = handleWriteRequest(request);
             // notify about the written content
@@ -81,6 +61,33 @@ public class UDPServer {
         }
     }
 
+    private String handleReadRequest(byte[] request){
+        int offset = 0;
+        String command = MessageUtil.bytesToString(request, offset);
+        offset += 4 + command.length();
+        String filePath = MessageUtil.bytesToString(request, offset);
+        offset += 4 + filePath.length();
+        int requestOffset = MessageUtil.bytesToInt(Arrays.copyOfRange(request, offset, offset + 4));
+        offset += 4;
+        int byteCount = MessageUtil.bytesToInt(Arrays.copyOfRange(request, offset, offset + 4));
+        try {
+        } catch (NumberFormatException e) {
+            return "ERROR:Invalid offset or byte count";
+        }
+        try (RandomAccessFile file = new RandomAccessFile(filePath, "r")) {
+            if (requestOffset >= file.length()) {
+                return "ERROR:Offset exceeds file length";
+            }
+            byte[] buffer = new byte[byteCount];
+            file.seek(requestOffset);
+            int bytesRead = file.read(buffer, 0, byteCount);
+            return "CONTENT:" + new String(buffer, 0, bytesRead);
+        } catch (FileNotFoundException e) {
+            return "ERROR:File not found";
+        } catch (IOException e) {
+            return "ERROR:" + e.getMessage();
+        }
+    }
 
     private String handleWriteRequest(byte[] request) {
         int offset=0;
@@ -173,6 +180,7 @@ public class UDPServer {
     }
 
     private void notifyRegisteredClients(String filePath, String content) {
+        filePath=filePath;
         List<RegisteredClient> clients = registeredClients.get(filePath);
         if (clients == null) return;
 

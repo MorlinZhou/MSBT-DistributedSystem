@@ -1,3 +1,5 @@
+package Client;
+
 import server.MessageUtil;
 
 import java.io.*;
@@ -13,6 +15,8 @@ public class Client {
     private static int BUFFER_SIZE = 10000;
     private Map<String, String> cache = new ConcurrentHashMap<>();
 
+    private static String rootPath="/Users/zhouhuayu/Desktop/";
+
     public Client() throws SocketException, UnknownHostException {
         socket = new DatagramSocket();
         serverAddress = InetAddress.getByName("localhost");
@@ -24,12 +28,12 @@ public class Client {
         if (fileContentInCache != null) {
             // Return the content from the cache
             if(byteCount+offset <= fileContentInCache.length()){
-                System.out.println("Reading from cache.");
+                System.out.print("Reading from cache: ");
                 return fileContentInCache.substring(offset, byteCount+offset);
             }
             // else, if the cached content is not sufficient, request from server again (you may choose to handle this differently)
         }
-        ByteArrayOutputStream requestStream = new ByteArrayOutputStream();
+        MyByteArrayStream requestStream = new MyByteArrayStream();
         requestStream.write(MessageUtil.stringToBytes("READ"));
         requestStream.write(MessageUtil.stringToBytes(filePath));
         requestStream.write(MessageUtil.intToBytes(offset));
@@ -42,14 +46,14 @@ public class Client {
         DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
         socket.receive(receivePacket);
         String fetchedContent = new String(receivePacket.getData(), 0, receivePacket.getLength());
-        cache.put(filePath, fetchedContent);
+        cache.put(filePath, fetchedContent.substring(8));
         return fetchedContent;
     }
 
 
     public String writeToFile(String filePath, int offset, String byteSequence) throws IOException {
         cache.put(filePath, byteSequence);
-        ByteArrayOutputStream requestStream = new ByteArrayOutputStream();
+        MyByteArrayStream requestStream = new MyByteArrayStream();
         requestStream.write(MessageUtil.stringToBytes("WRITE"));
         requestStream.write(MessageUtil.stringToBytes(filePath));
         requestStream.write(MessageUtil.intToBytes(offset));
@@ -65,7 +69,7 @@ public class Client {
     }
 
     public String monitorFile(String filePath, long interval) throws IOException {
-        ByteArrayOutputStream requestStream = new ByteArrayOutputStream();
+        MyByteArrayStream requestStream = new MyByteArrayStream();
         requestStream.write(MessageUtil.stringToBytes("MONITOR"));
         requestStream.write(MessageUtil.stringToBytes(filePath));
         requestStream.write(MessageUtil.longToBytes(interval));
@@ -96,7 +100,7 @@ public class Client {
     }
 
     public String renameFile(String oldFilePath, String newFileName) throws IOException {
-        ByteArrayOutputStream requestStream = new ByteArrayOutputStream();
+        MyByteArrayStream requestStream = new MyByteArrayStream();
         requestStream.write(MessageUtil.stringToBytes("RENAME"));
         requestStream.write(MessageUtil.stringToBytes(oldFilePath));
         requestStream.write(MessageUtil.stringToBytes(newFileName));
@@ -122,8 +126,8 @@ public class Client {
                 break;
             }
             if ("READ".equals(operation)) {
-                System.out.println("Enter file path:");
-                String filePath = scanner.nextLine();
+                System.out.println("Enter file path: /remoteFile/"+"  "+"You don't have to enter '/' at the beginning.");
+                String filePath = rootPath+scanner.nextLine();
                 System.out.println("Enter offset:");
                 int offset = scanner.nextInt();
                 System.out.println("Enter byte count:");
@@ -135,7 +139,7 @@ public class Client {
             }
             else if ("WRITE".equals(operation)) {
                 System.out.println("Enter file path:");
-                String filePath = scanner.nextLine();
+                String filePath = rootPath+scanner.nextLine();
                 System.out.println("Enter offset:");
                 int offset = scanner.nextInt();
                 scanner.nextLine(); // Consume newline
@@ -146,7 +150,7 @@ public class Client {
                 System.out.println(response);
             } else if ("MONITOR".equals(operation)) {
                 System.out.println("Enter file path:");
-                String filePath = scanner.nextLine();
+                String filePath = rootPath+scanner.nextLine();
                 System.out.println("Enter monitoring interval (in milliseconds):");
                 long interval = scanner.nextLong();
                 scanner.nextLine(); // Consume newline
@@ -155,7 +159,7 @@ public class Client {
                 System.out.println(response);
             } else if ("RENAME".equals(operation)) {
                 System.out.println("Enter the old file path:");
-                String oldFilePath = scanner.nextLine();
+                String oldFilePath = rootPath+scanner.nextLine();
                 System.out.println("Enter the new file name:");
                 String newFileName = scanner.nextLine();
 
