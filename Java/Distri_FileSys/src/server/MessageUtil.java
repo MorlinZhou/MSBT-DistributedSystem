@@ -35,16 +35,6 @@ public class MessageUtil {
         return ByteBuffer.wrap(bytes).getLong();
     }
 
-    public static byte[] stringToLongBytes(String str) {
-        long longValue = Long.parseLong(str);
-        return longToBytes(longValue);
-    }
-
-    public static String longBytesToString(byte[] bytes, int offset) {
-        long longValue = bytesToLong(Arrays.copyOfRange(bytes, offset, offset + 8));
-        return String.valueOf(longValue);
-    }
-
     public static long longByteToLong(byte[] bytes, int offset) {
         return ByteBuffer.wrap(Arrays.copyOfRange(bytes, offset, offset + 8)).getLong();
     }
