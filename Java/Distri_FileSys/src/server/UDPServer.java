@@ -181,8 +181,8 @@ public class UDPServer {
         return "SUCCESS:Monitoring started for " + filePath + " for " + interval + " milliseconds";
     }
 
-    private void notifyRegisteredClients(String filePath, String content) {
-        filePath=filePath;
+    private void notifyRegisteredClients(String monitoredFilePath, String content) {
+        String filePath=monitoredFilePath;
         List<RegisteredClient> clients = registeredClients.get(filePath);
         if (clients == null) return;
 
