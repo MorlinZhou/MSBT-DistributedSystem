@@ -20,7 +20,7 @@ Xue Yuhan: Responsible for the design and implementation of: client Cache, remot
 
 ### 1.1 Architecture Design
 
-<img src="/Users/zhouhuayu/Documents/学习/MSBT/Semester 1/Distributed System/MSBT-DistributedSystem/Java/assets/image-20231024182423404.png" alt="image-20231024182423404" style="zoom: 67%;" />
+<img src="assets/image-20231024182423404.png" alt="image-20231024182423404" style="zoom: 67%;" />
 
 ### 1.2 Message Structure
 
