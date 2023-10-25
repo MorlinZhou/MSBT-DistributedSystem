@@ -13,27 +13,33 @@ public class Client {
     private InetAddress serverAddress;
     private static int PORT = 8080;
     private static int BUFFER_SIZE = 10000;
-    private static int FRESHNESS_INTERVAL = 0;
-    private Map<String, String> cache = new ConcurrentHashMap<>();
+    private static long FRESHNESS_INTERVAL = 0;
+    private Map<String, Map<Integer, String>> cache = new ConcurrentHashMap<>();
+    private Map<String, Long> cacheTimestamps = new ConcurrentHashMap<>();
     private static String rootPath="/Users/zhouhuayu/Desktop/";
+
 
     public Client(int freshInter) throws SocketException, UnknownHostException {
         socket = new DatagramSocket();
         serverAddress = InetAddress.getByName("localhost");
         FRESHNESS_INTERVAL=freshInter;
     }
-    //系统应该实现客户端缓存，即客户端读取的⽂件内容保留在客户端程序的缓冲区中
+    //The system should implement client-side caching, that is, the file content read by the client is retained in the buffer of the client program
 
     public String readFile(String filePath, int offset, int byteCount) throws IOException {
-        String fileContentInCache = cache.get(filePath);
-        if (fileContentInCache != null) {
-            // Return the content from the cache
-            if(byteCount+offset <= fileContentInCache.length()){
-                System.out.print("Reading from cache: ");
-                return fileContentInCache.substring(offset, byteCount+offset);
+        Map<Integer, String> offsetCache = cache.get(filePath);
+        Long lastUpdatedTimestamp = cacheTimestamps.get(filePath);
+        if (lastUpdatedTimestamp != null && (System.currentTimeMillis() - lastUpdatedTimestamp) <= FRESHNESS_INTERVAL && offsetCache != null) {
+            for (Map.Entry<Integer, String> entry : offsetCache.entrySet()) {
+                int startOffset = entry.getKey();
+                String cachedContent = entry.getValue();
+                if (offset >= startOffset && offset + byteCount <= startOffset + cachedContent.length()) {
+                    System.out.print("Reading from cache: ");
+                    return cachedContent.substring(offset - startOffset, offset - startOffset + byteCount);
+                }
             }
-            // else, if the cached content is not sufficient, request from server again (you may choose to handle this differently)
         }
+
         //Using custom ByteArrayOutputStream class
         MyByteArrayStream requestStream = new MyByteArrayStream();
         requestStream.write(MessageUtil.stringToBytes("READ"));
@@ -48,13 +54,17 @@ public class Client {
         DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
         socket.receive(receivePacket);
         String fetchedContent = new String(receivePacket.getData(), 0, receivePacket.getLength());
-        cache.put(filePath, fetchedContent.substring(8));
+        if (offsetCache == null) {
+            offsetCache = new ConcurrentHashMap<>();
+            cache.put(filePath, offsetCache);
+        }
+        offsetCache.put(offset, fetchedContent.substring(8));
+        cacheTimestamps.put(filePath, System.currentTimeMillis());
         return fetchedContent;
     }
 
 
     public String writeToFile(String filePath, int offset, String byteSequence) throws IOException {
-        cache.put(filePath, byteSequence);
         //Using custom ByteArrayOutputStream class
         MyByteArrayStream requestStream = new MyByteArrayStream();
         requestStream.write(MessageUtil.stringToBytes("WRITE"));
@@ -68,7 +78,16 @@ public class Client {
         byte[] receiveBuffer = new byte[BUFFER_SIZE];
         DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
         socket.receive(receivePacket);
-        return new String(receivePacket.getData(), 0, receivePacket.getLength());
+        String response = new String(receivePacket.getData(), 0, receivePacket.getLength());
+        String updatedContent = readFile(filePath, offset, byteSequence.length());
+        Map<Integer, String> offsetCache = cache.get(filePath);
+        if (offsetCache == null) {
+            offsetCache = new ConcurrentHashMap<>();
+            cache.put(filePath, offsetCache);
+        }
+        offsetCache.put(offset, updatedContent);
+
+        return response;
     }
 
     public String monitorFile(String filePath, long interval) throws IOException {
@@ -176,7 +195,7 @@ public class Client {
                 String filePath = rootPath+scanner.nextLine();
                 System.out.println("Enter offset:");
                 int offset = scanner.nextInt();
-                scanner.nextLine(); // Consume newline
+                scanner.nextLine();
                 System.out.println("Enter byte sequence:");
                 String byteSequence = scanner.nextLine();
 
@@ -187,7 +206,7 @@ public class Client {
                 String filePath = rootPath+scanner.nextLine();
                 System.out.println("Enter monitoring interval (in milliseconds):");
                 long interval = scanner.nextLong();
-                scanner.nextLine(); // Consume newline
+                scanner.nextLine();
 
                 String response = client.monitorFile(filePath, interval);
                 System.out.println(response);
