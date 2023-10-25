@@ -4,11 +4,15 @@ package Arg
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+const LocalFilePath = "E:/DSWork/Client"
 
 type LookArg struct {
 	FilePath string
@@ -48,7 +52,7 @@ func (l *LookArg) GetFilepath() string {
 
 func (l *LookArg) LocalCall(socket *net.UDPConn) error {
 	fmt.Printf("Open File Path is %v\n", l.FilePath)
-	path := filepath.Join("E:/DSWork/Client", l.FilePath)
+	path := filepath.Join(LocalFilePath, l.FilePath)
 	f, err := os.Open(path)
 	if err != nil {
 		fmt.Println("read fail")
@@ -101,7 +105,7 @@ func (I *InsertArg) GetFilepath() string {
 }
 func (I *InsertArg) LocalCall(socket *net.UDPConn) error {
 
-	path := filepath.Join("E:/DSWork/Client", I.FilePath)
+	path := filepath.Join(LocalFilePath, I.FilePath)
 	fmt.Printf("Open File Path is %v\n", path)
 	f, err := os.Open(path)
 
@@ -169,19 +173,19 @@ func (I *InsertArg) LocalCall(socket *net.UDPConn) error {
 	buf.Write(output)
 	if err == nil {
 		_, err = socket.Write(buf.Bytes()) // 发送数据
-
 		if err != nil {
 			fmt.Println("发送数据失败，err:", err)
+			return err
 		}
-		return err
 	}
+
 	n, remoteAddr, err := socket.ReadFromUDP(data) // 接收数据
 
 	if err != nil {
 		fmt.Println("接收数据失败，err:", err)
 		return err
 	}
-	fmt.Printf("require insert successfully, recv data: %v \naddr:%v count:%v\n\n", string(data[:n]), remoteAddr, n)
+	fmt.Printf("\nrequire insert successfully, recv data: %v \naddr:%v count:%v\n\n", string(data[:n]), remoteAddr, n)
 
 	return fmt.Errorf("Argument Error")
 }
@@ -207,7 +211,7 @@ func (M *MonitorArg) StoB() (output []byte, err error) {
 	} else {
 		return []byte{}, fmt.Errorf("intput FilePath is null")
 	}
-	buf.Write([]byte(fmt.Sprintf("\\Monitor %v ", M.MonitorInterval)))
+	buf.Write([]byte(fmt.Sprintf("\\Monitor %v ", M.MonitorInterval))) //监视间隔
 	return buf.Bytes(), nil
 }
 
@@ -219,4 +223,169 @@ func (M *MonitorArg) GetFilepath() string {
 }
 func (M *MonitorArg) LocalCall(socket *net.UDPConn) error {
 	return nil
+}
+
+type AppendArg struct {
+	FilePath string
+	Bytes    []byte
+}
+
+func NewAppendArg(filepath string, bytes []byte) (A *AppendArg) {
+	A = &AppendArg{
+		FilePath: filepath,
+		Bytes:    bytes,
+	}
+	return
+}
+func (A *AppendArg) StoB() (output []byte, err error) {
+	var buf bytes.Buffer
+
+	if len(A.FilePath) != 0 {
+		buf.Write([]byte(fmt.Sprintf("\\FilePath %v ", A.FilePath)))
+	} else {
+		return []byte{}, fmt.Errorf("intput FilePath is null")
+	}
+	buf.Write([]byte(fmt.Sprintf("\\Bytes %v ", A.Bytes)))
+	return buf.Bytes(), nil
+}
+
+func (A *AppendArg) Type() string {
+	return "Append"
+}
+func (A *AppendArg) GetFilepath() string {
+	return A.FilePath
+}
+func (A *AppendArg) LocalCall(socket *net.UDPConn) error {
+	path := filepath.Join(LocalFilePath, A.FilePath)
+	fmt.Printf("Open File Path is %v\n", path)
+
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+
+	if err != nil {
+		fmt.Println("open ", path, " fail")
+		return err
+	}
+	_, err = f.Write(A.Bytes)
+	if err != nil {
+		fmt.Println("append ", path, " fail")
+		return err
+	}
+
+	f.Close()
+
+	fmt.Println(path)
+
+	//fmt.Println("追加执行完毕")
+	check, err := os.Open(path)
+	defer check.Close()
+	read := make([]byte, 1024)
+	n, err := check.Read(read)
+	data := read[:n]
+	fmt.Printf("the content of local file %v has changed\ndata is %v\n", A.FilePath, string(data))
+
+	//等待服务器响应
+	var buf bytes.Buffer
+	buf.Write([]byte(fmt.Sprintf("\\CallType Append ")))
+	output, err := A.StoB()
+	buf.Write(output)
+	if err == nil {
+		_, err = socket.Write(buf.Bytes()) // 发送数据
+		fmt.Println("send change message to server")
+		if err != nil {
+			fmt.Println("发送数据失败，err:", err)
+			return err
+		}
+	}
+	n, remoteAddr, err := socket.ReadFromUDP(data) // 接收数据
+
+	if err != nil {
+		fmt.Println("接收数据失败，err:", err)
+		return err
+	}
+	fmt.Printf("\nrequire append successfully, recv data: %v \naddr:%v count:%v\n\n", string(data[:n]), remoteAddr, n)
+
+	return fmt.Errorf("Argument Error")
+}
+
+type SearchArg struct {
+	FilePath string
+	Bytes    []byte
+}
+
+func NewSearchArg(filepath string, Bytes []byte) (S *SearchArg) {
+	S = &SearchArg{
+		FilePath: filepath,
+		Bytes:    Bytes,
+	}
+	return
+}
+
+func (S *SearchArg) StoB() (output []byte, err error) {
+	var buf bytes.Buffer
+
+	if len(S.FilePath) != 0 {
+		buf.Write([]byte(fmt.Sprintf("\\FilePath %v ", S.FilePath)))
+	} else {
+		return []byte{}, fmt.Errorf("intput FilePath is null")
+	}
+	buf.Write([]byte(fmt.Sprintf("\\Bytes %v ", S.Bytes)))
+	return buf.Bytes(), nil
+}
+
+func (S *SearchArg) Type() string {
+	return "Search"
+}
+func (S *SearchArg) GetFilepath() string {
+	return S.FilePath
+}
+
+func (S *SearchArg) LocalCall(socket *net.UDPConn) error {
+	offset := -1
+	path := filepath.Join(LocalFilePath, S.FilePath)
+	fmt.Printf("Open File Path is %v\n", path)
+	f, err := os.Open(path)
+	if err != nil {
+		log.Println("search file fail")
+		return err
+	}
+	data := make([]byte, 4096)
+	n, err := f.Read(data)
+	fmt.Println(string(data[:n]))
+	offset = strings.Index(string(data[:n]), string(S.Bytes)) //回车算两个字符
+	f.Close()
+
+	fmt.Println("查找 执行完毕")
+	check, err := os.Open(path)
+	defer check.Close()
+	read := make([]byte, 1024)
+	n, err = check.Read(read)
+	data = read[:n]
+	if offset != -1 {
+		fmt.Printf("the searched offset is %v\n", offset)
+	} else {
+		fmt.Printf("search fail\n")
+	}
+
+	//等待服务器响应
+	var buf bytes.Buffer
+	buf.Write([]byte(fmt.Sprintf("\\CallType Search ")))
+	output, err := S.StoB()
+	buf.Write(output)
+	if err == nil {
+		_, err = socket.Write(buf.Bytes()) // 发送数据
+		fmt.Println("send change message to server")
+		if err != nil {
+			fmt.Println("发送数据失败，err:", err)
+			return err
+		}
+	}
+	n, remoteAddr, err := socket.ReadFromUDP(data) // 接收数据
+
+	if err != nil {
+		fmt.Println("接收数据失败，err:", err)
+		return err
+	}
+	fmt.Printf("\nrequire search successfully, recv data: %v \naddr:%v count:%v\n\n", string(data[:n]), remoteAddr, n)
+
+	return fmt.Errorf("Argument Error")
 }

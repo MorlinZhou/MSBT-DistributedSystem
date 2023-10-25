@@ -1,4 +1,4 @@
-package DSWork
+package main
 
 import (
 	"DSWork/Server/SysCall"
@@ -7,8 +7,10 @@ import (
 	"time"
 )
 
+const LocalIp = "127.0.0.1"
+
 func Test_server(t *testing.T) {
-	localIp := net.ParseIP("127.0.0.1")
+	localIp := net.ParseIP(LocalIp)
 	var Port = []int{30000, 30001}
 
 	s := SysCall.NewServer(localIp, Port)

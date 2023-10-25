@@ -3,14 +3,18 @@ package SysCall
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
+
+const ServerFilePath = "E:/DSWork/Server"
 
 //var prepath = "E:/DSWork/Server"
 //var pretmppath = "E:/DSWork/Server/file/temp"
@@ -128,8 +132,9 @@ func (s *Server) BootServer() {
 				if s.Sfunc[i].SystemCallFunc == "Monitor" {
 					for j := 0; j < len(s.Waitlist); j++ {
 						for s.Waitlist[j].Raddress == addr && s.Waitlist[j].used == true { //判断是否有monitor
-							time.Sleep(time.Second)
+							time.Sleep(500 * time.Millisecond)
 							if s.Waitlist[j].used == false {
+								fmt.Println("monitor done!")
 								listen.WriteToUDP([]byte("monitor done!"), addr)
 							}
 						}
@@ -149,7 +154,8 @@ func (s *Server) BootServer() {
 func (s *Server) ExecuteCall(index int, addr *net.UDPAddr, listen *net.UDPConn) (B []byte, e error) {
 	switch s.Sfunc[index].SystemCallFunc {
 	case "LookUp":
-		return s.Sfunc[index].LookUp()
+		B, e = s.Sfunc[index].LookUp()
+		return
 	case "Insert":
 		//实现顺序互斥执行的重点
 		//s.mu.Lock()
@@ -169,24 +175,30 @@ func (s *Server) ExecuteCall(index int, addr *net.UDPAddr, listen *net.UDPConn) 
 	case "Monitor":
 		B, e = s.Monitor(index, addr, listen)
 		return
+	case "Append":
+		B, e = s.Sfunc[index].Append()
+		return
+	case "Search":
+		B, e = s.Sfunc[index].Search()
+		return
 	}
 	return []byte{}, nil
 }
 
 func (s *ServerFunc) LookUp() ([]byte, error) {
 	fmt.Printf("Open File Path is %v\n", s.FilePath)
-	path := filepath.Join("E:/DSWork/Server", s.FilePath)
+	path := filepath.Join(ServerFilePath, s.FilePath)
 	f, err := os.Open(path)
+	defer f.Close()
 	if err != nil {
 		fmt.Println("read fail")
 	}
-	defer f.Close()
 	output := make([]byte, s.Number)
+
 	_, err = f.ReadAt(output, int64(s.Offset))
 	if err != nil {
 		return nil, err
-	}
-
+	} //如果read到头会返回io.EOF，这时候取全部就行
 	//return output,err // no full-caching
 
 	fulldata := make([]byte, 1024) //全部数据
@@ -196,10 +208,11 @@ func (s *ServerFunc) LookUp() ([]byte, error) {
 	}
 	var buf bytes.Buffer
 	buf.Write(output)
-	deleteChar := rune(0x007F)
+	deleteChar := rune(0x007F) //标识符，发送给客户端意味着结尾，相当于EOF,标识符前面的是请求读取的内容
 	buf.WriteRune(deleteChar)
 	//buf.WriteString("\n")
-	buf.Write(fulldata[:n])
+	buf.Write(fulldata[:n]) //标识符后下面是文件的全部内容，用于caching
+
 	return buf.Bytes(), err
 }
 
@@ -207,7 +220,7 @@ func (s *ServerFunc) Insert() ([]byte, error) {
 	//_, filename := filepath.Split(s.FilePath)
 
 	fmt.Printf("Open File Path is %v\n", s.FilePath)
-	path := filepath.Join("E:/DSWork/Server", s.FilePath)
+	path := filepath.Join(ServerFilePath, s.FilePath)
 	f, err := os.Open(path)
 
 	if err != nil {
@@ -261,6 +274,48 @@ func (s *ServerFunc) Insert() ([]byte, error) {
 	read := make([]byte, 1024)
 	n, err = check.Read(read)
 	return read[:n], nil
+}
+
+func (s *ServerFunc) Append() ([]byte, error) {
+	fmt.Printf("Open File Path is %v\n", s.FilePath)
+	path := filepath.Join(ServerFilePath, s.FilePath)
+
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+
+	if err != nil {
+		fmt.Println("open ", path, " fail")
+		return nil, err
+	}
+	_, err = f.Write(s.Bytes)
+	if err != nil {
+		fmt.Println("append ", path, " fail")
+		return nil, err
+	}
+
+	f.Close()
+	return []byte("Append Done"), nil
+}
+
+func (s *ServerFunc) Search() ([]byte, error) {
+	offset := -1
+	path := filepath.Join(ServerFilePath, s.FilePath)
+	fmt.Printf("Open File Path is %v\n", path)
+	f, err := os.Open(path)
+	if err != nil {
+		log.Println("search file fail")
+		return nil, err
+	}
+	data := make([]byte, 4096)
+	n, err := f.Read(data)
+	fmt.Println(string(data[:n]))
+	offset = strings.Index(string(data[:n]), string(s.Bytes)) //回车算两个字符
+	f.Close()
+
+	if offset != -1 {
+		b := fmt.Sprintf("searched done,offset is %b", offset)
+		return []byte(b), nil
+	}
+	return []byte("search fail"), nil
 }
 
 func (s *Server) Monitor(index int, addr *net.UDPAddr, listen *net.UDPConn) ([]byte, error) {

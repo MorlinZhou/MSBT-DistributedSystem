@@ -24,3 +24,8 @@ func TestCheckLocalFile(t *testing.T) {
 	fmt.Println(CheckLocalFile("file/check1.txt"))
 	fmt.Println(CheckLocalFile("file/check2.txt"))
 }
+
+func TestSearch(t *testing.T) {
+	_Arg := Arg.NewSearchArg("file/check1.txt", []byte{'I', '1'})
+	fmt.Println(Search(_Arg))
+}
