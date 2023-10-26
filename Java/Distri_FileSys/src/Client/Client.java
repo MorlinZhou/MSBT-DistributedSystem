@@ -63,7 +63,30 @@ public class Client {
         return fetchedContent;
     }
 
+    public String readAfterWrite(String filePath, int offset, int byteCount)throws IOException{
+        Map<Integer, String> offsetCache = cache.get(filePath);
+        MyByteArrayStream requestStream = new MyByteArrayStream();
+        requestStream.write(MessageUtil.stringToBytes("READ"));
+        requestStream.write(MessageUtil.stringToBytes(filePath));
+        requestStream.write(MessageUtil.intToBytes(offset));
+        requestStream.write(MessageUtil.intToBytes(byteCount));
+        byte[] sendBuffer = requestStream.toByteArray();
+        DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, serverAddress, PORT);
+        socket.send(sendPacket);
 
+        byte[] receiveBuffer = new byte[BUFFER_SIZE];
+        DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
+        socket.receive(receivePacket);
+        String fetchedContent = new String(receivePacket.getData(), 0, receivePacket.getLength());
+        if (offsetCache == null) {
+            offsetCache = new ConcurrentHashMap<>();
+            cache.put(filePath, offsetCache);
+        }
+        offsetCache.put(offset, fetchedContent.substring(8));
+        cacheTimestamps.put(filePath, System.currentTimeMillis());
+        return fetchedContent;
+
+    }
     public String writeToFile(String filePath, int offset, String byteSequence) throws IOException {
         //Using custom ByteArrayOutputStream class
         MyByteArrayStream requestStream = new MyByteArrayStream();
@@ -79,13 +102,13 @@ public class Client {
         DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
         socket.receive(receivePacket);
         String response = new String(receivePacket.getData(), 0, receivePacket.getLength());
-        String updatedContent = readFile(filePath, offset, byteSequence.length());
+        String updatedContent = readAfterWrite(filePath, offset, byteSequence.length());
         Map<Integer, String> offsetCache = cache.get(filePath);
         if (offsetCache == null) {
             offsetCache = new ConcurrentHashMap<>();
             cache.put(filePath, offsetCache);
         }
-        offsetCache.put(offset, updatedContent);
+        offsetCache.put(offset, updatedContent.substring(8));
 
         return response;
     }
